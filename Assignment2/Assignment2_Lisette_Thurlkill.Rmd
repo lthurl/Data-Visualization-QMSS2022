@@ -1,0 +1,236 @@
+---
+title: "Assignment2_Lisette_Thurlkill"
+author: "Lisette Thurlkill"
+date: "3/18/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo=FALSE}
+library(tidyverse)
+```
+```{r, echo=FALSE}
+library(stringr)
+```
+```{r, echo=FALSE}
+library(reshape2)
+```
+```{r, echo=FALSE}
+library(grid)
+```
+```{r, echo=FALSE}
+library(rvest)
+```
+```{r, echo=FALSE}
+library(stringr)
+```
+```{r, echo=FALSE}
+library(ggplot2)
+```
+```{r, echo=FALSE}
+library(ggthemes)
+```
+```{r, echo=FALSE}
+library(plotly)
+```
+```{r, echo=FALSE}
+library(grid)
+```
+```{r, echo=FALSE}
+library(ggrepel)
+```
+```{r, echo=FALSE}
+library(png)
+```
+```{r, echo=FALSE}
+library(DT)
+```
+```{r, echo=FALSE}
+library(dplyr)
+```
+```{r, echo=FALSE}
+library(geojsonR)
+```
+#The Task: explore the key variables of AirBnB use, the locations of AirBnB places, and some (potential) indications on how it impacts the rental market.
+
+### Reading the Airbnb file and subsetting the larger airbnb file to reduce the size of the dataset we will be using. We also change price, host_id, and availability_365 to a numeric value for later analysis. 
+
+```{r, echo=FALSE}
+#setting the csv
+setwd("C:/Users/lgptp/Documents/QMSSDATAVIS/Assignment2/data")
+airbnb_listings <- read_csv('airbnb_listings.csv', show_col_types = FALSE)
+head(airbnb_listings)
+
+airbnb <-subset(airbnb_listings, select = c(id,name, transit, host_id, host_name, host_listings_count, latitude, longitude, room_type, accommodates, bathrooms, bedrooms, price, availability_365, number_of_reviews, last_review, review_scores_cleanliness, review_scores_location, review_scores_rating, neighbourhood, neighbourhood_group_cleansed))
+colnames(airbnb)[colnames(airbnb)=='host_neighbourhood']<-'neighbourhood'
+airbnb <- airbnb %>% mutate(across(starts_with("price"), ~gsub("\\$", "", .) %>% as.numeric))
+airbnb <- airbnb %>% mutate(across(starts_with("host_id"), ~gsub("\\$", "", .) %>% as.numeric))
+airbnb <- airbnb %>% mutate(across(starts_with("availability_365"), ~gsub("\\$", "", .) %>% as.numeric))
+head(airbnb)
+```
+### Reading in the Geojson file of NYC neighborhoods.
+```{r, echo=FALSE}
+#reading in the geojson
+library(rgdal)
+nyc <- rgdal::readOGR("data/neighbourhoods.geojson")
+```
+
+## Question 1 : Overall Location
+
+### a) Provide a map to show where in New York City AirBnB listings are located.Let' start with a super basic map.
+
+```{r, echo=FALSE}
+#Let's start with a super basic map
+library(leaflet)
+leaflet(airbnb) %>%
+  addTiles() %>%
+ setView(-73.935242, 40.730610, zoom = 10)  %>%
+  addCircles()
+#but this isn't lovely so let's see what else we can create...
+```
+
+#### But it isn't lovely so let's see what else we can create... We will add circles onto the leaflet map and employ clustering to make it look cleaner. The color is differentiated by host_id. The annotation portion can be seen through the neighborhood name popups. 
+
+```{r, echo=FALSE}
+#This looks better, and is easier to look at
+nyc_bnb <- leaflet(airbnb) %>% addProviderTiles("Stamen.TonerLite") %>% setView(-73.935242, 40.730610, zoom = 10) 
+nycairbnb <- nyc_bnb %>% addCircleMarkers( color='Set1', clusterOptions=markerClusterOptions()) 
+
+nycairbnb
+```
+
+### b) Provide a map in which you summarize the density of the AirBnB listings and highlight the hot-spots for AirBnB locations. 
+#### We can see here that the neighborhoods with darker red have a higher density of airbnb listings, while those with light yellow have less airbnb listings. Readers can hover over the neighborhoods. 
+
+```{r, echo=FALSE}
+#merging the csv and geojston
+nyc_airbnb <- merge(nyc, airbnb,by="neighbourhood", duplicateGeoms=TRUE)
+bins <- bins <- c(0, 10, 20, 50, 100, 200, 500, 1000, Inf) 
+pal3 <- colorBin("YlOrRd",domain = nyc_airbnb$id, bins=bins)
+color_id1 <- pal3(nyc_airbnb$id)
+content1 <- paste("Neighborhood:", nyc_airbnb$neighbourhood,"<br/>")
+bnbmap <- leaflet(nyc_airbnb) %>% setView(-73.935242, 40.730610, zoom = 10) %>% addPolygons(stroke=TRUE, smoothFactor = 0.5, weight=1, color=color_id1,popup=content1, opacity=1, fillColor=~colorQuantile('YlOrRd', nyc_airbnb$id)(nyc_airbnb$id),fillOpacity=1) %>% addProviderTiles("Stamen.TonerLite") %>% addLegend(pal=pal3, values= ~nyc_airbnb$id, title = "Density of AirBnb Listings in Neighborhood")
+bnbmap
+```
+
+## Question 2 : Renting out your apartment vs. permanent rentals
+
+## a) Choose a combination of both maps and non-mapping visualizations (graphs or tables) to explore where in NYC listings are available sporadically vs. year-round. Make sure to highlight the neighborhoods were most listings appear to be permanent or semi-permanent rentals. 
+
+### We are going to start with some clustering to see which listing are available sporadically or year-round. 
+
+```{r, echo=FALSE}
+#make a clustering
+airbnb_sub <- airbnb 
+airbnb_sub$availability_365[airbnb_sub$availability_365 != 365] <- 'Sporadically'
+airbnb_sub$availability_365[airbnb_sub$availability_365 == 365] <- 'Year-Round'
+head(airbnb_sub)
+```
+
+### To show which neighborhoods had the most permanent or semi-permanent rentals, we can create a map of the aforementioned cluster table. The green listings are those available year-round, while red indicates listings which are only sporadically available
+
+```{r, echo=FALSE}
+#Map of cluster
+palcl = colorFactor("Set1",airbnb_sub$availability_365)
+color_id2 = palcl(airbnb_sub$availability_365)
+clustermap <- leaflet(airbnb_sub) %>% addProviderTiles("Stamen.TonerLite") %>% setView(-73.935242, 40.730610, zoom = 10) %>% addCircleMarkers(color=color_id2, clusterOptions=markerClusterOptions()) %>% addLegend(pal=palcl, values= ~airbnb_sub$availability_365, title = "Sporadically or Year-round")
+clustermap
+```
+### The map above is wonderful and interactive, however, let's show in a more concise way which neighborhoods have the most permanent (year-round) listings and which neighborhoods have the most sporadic. The tables below demonstrate this. 
+```{r, echo=FALSE}
+#table of year-round listings
+year_round <- airbnb %>%
+              select(availability_365, latitude, longitude, neighbourhood) %>%
+              filter(availability_365==365) %>% subset(neighbourhood != 'Fenway/Kenmore')
+year_round <- year_round[!(is.na(year_round$neighbourhood) | year_round$neighbourhood==""), ]
+year_round %>%
+  group_by(neighbourhood) %>%
+  dplyr::summarize(num_listings = n(), 
+            neighborhood = unique(neighbourhood)) %>%
+  top_n(n = 10, wt = num_listings) %>% 
+  ggplot(aes(x = fct_reorder(neighbourhood, num_listings), 
+             y = num_listings, fill = neighbourhood)) +
+  geom_col() +
+  scale_fill_brewer(palette = "Paired") +
+  coord_flip()+
+  labs(title = "Top 10 Neighborhoods (Year-Round)",
+       x = "Neighborhood", y = "Listing count")
+```
+```{r, echo=FALSE}
+#table of Sporadic listings
+sporadic <- airbnb %>%
+              select(availability_365, latitude, longitude, neighbourhood) %>%
+              filter(availability_365==365) %>% subset(neighbourhood != 'Fenway/Kenmore')
+sporadic <- sporadic[!(is.na(sporadic$neighbourhood) | sporadic$neighbourhood==""), ]
+sporadic %>%
+  group_by(neighbourhood) %>%
+  dplyr::summarize(num_listings = n(), 
+            neighborhood = unique(neighbourhood)) %>%
+  top_n(n = 10, wt = num_listings) %>% 
+  ggplot(aes(x = fct_reorder(neighbourhood, num_listings), 
+             y = num_listings, fill = neighbourhood)) +
+  geom_col() +
+  scale_fill_brewer(palette = "BrBG") +
+  coord_flip()+
+  labs(title = "Top 10 Neighborhoods (Sporadic)",
+       x = "Neighborhood", y = "Listing count")
+```
+
+
+## b) Some hosts (identified by host_id) operate multiple rentals. Provide a data table of the the top hosts, the total number of listings they are associated with, the average nightly price, and the estimated average monthly total income from these listings.
+
+### First, we divide the availability 365 variable by 12 to get the monthly price. After, 
+
+```{r, echo=FALSE}
+#dividing the availability 365 variable by 12 to get monthly price
+
+airbnb$monthly_price <- (airbnb$availability_365 / 12) * as.numeric(airbnb$price)
+```
+
+```{r, echo=FALSE}
+#count and look at host_id variable
+hostrentnum <- airbnb%>%group_by(host_id)%>%summarize(count=n())
+hostrentnum <- hostrentnum%>%arrange(desc(count))
+hostrentnum <- merge(airbnb, hostrentnum, by='host_id')
+hostrentnum <- subset(hostrentnum, count > 70) 
+colnames(hostrentnum)[colnames(hostrentnum)=='price.x']<-'price'
+colnames(hostrentnum)[colnames(hostrentnum)=='count']<-'number_of_listings'
+hostrentnum <- dplyr::select(hostrentnum,c('host_id','number_of_listings','price','monthly_price')) 
+monthly_income <- aggregate(monthly_price~host_id, hostrentnum, sum,na.rm=TRUE)
+hostrentnum <- merge(hostrentnum,monthly_income, by='host_id') 
+colnames(hostrentnum)[colnames(hostrentnum)=='monthly_price.x']<-'monthly_price'
+colnames(hostrentnum)[colnames(hostrentnum)=='monthly_price.y']<-'total_income'
+hostrentnum <- hostrentnum %>% arrange(desc(number_of_listings))
+head(hostrentnum)
+```
+
+## Question 3: Provide an interactive map which shows the Top 100 most expensive and Top 100 best reviewed rentals in NYC.
+
+### We started by defining the most expensive rentals in NYC, cutting it at the highest priced 100. Then we defined the the best reviewed, again cutting at the top 100. The map then shows the top 100 most expensive (red) and best rated (green) airbnb listings. When you hover over the listing, you can see the number of rooms, the price, how many people the rental accomodates, the number of bathrooms, and the cleanliness ratings. 
+
+```{r, echo=FALSE}
+expensive <- airbnb %>% arrange(desc(price)) %>% slice(1:100)
+expensive$label <- 'Expensive'
+review <- airbnb %>% arrange(desc(review_scores_rating)) %>% slice(1:100)
+review$label <- 'Rated Highly'
+top_exprev <- rbind(expensive, review)
+head(top_exprev)
+pal3 = colorFactor("Set1",top_exprev$label)
+color_id3 = pal3(top_exprev$label)
+content2 <- paste("Room:", top_exprev$room_type,"<br/>",
+                  "Price:", top_exprev$price,"<br/>",
+                 "Accomodates:",top_exprev$accommodates,"<br/>",
+                 "Bathrooms:",top_exprev$bathrooms,"<br/>",
+                 "Cleanliness:",top_exprev$review_scores_cleanliness,"<br/>",
+                 "Transit:",top_exprev$transit,"<br/>")
+cluster2 <- leaflet(top_exprev) %>% addProviderTiles("Stamen.TonerLite") %>% setView(-73.935242, 40.730610, zoom = 10) %>% addCircleMarkers(color=color_id3, popup=content2,clusterOptions=markerClusterOptions()) %>% addLegend(pal=pal3, values= ~top_exprev$label, title = "Top 100 Most Expensive / Top 100 Rated Highly")
+cluster2
+```
+
+
+
+
+
