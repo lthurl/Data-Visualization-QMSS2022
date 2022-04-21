@@ -31,3 +31,12 @@ b) Some hosts (identified by host_id) operate multiple rentals. Provide a data t
 **3. Top Reviewed Rentals**
 
 Provide an interactive map which shows the Top 100 most expensive and Top 100 best reviewed rentals in NYC.
+
+## **Assignment 3** *To be Uploaded*
+### Kickstarter
+
+Kickstarter is an American public-benefit corporation based in Brooklyn, New York, that maintains a global crowd funding platform focused on creativity.  The company's stated mission is to "help bring creative projects to life". 
+
+Kickstarter has reportedly received almost $6 billion in pledges from 20 million backers to fund more than 200,000 creative projects, such as films, music, stage shows, comics, journalism, video games, technology and food-related projects.
+
+For this assignment, I am asking you to analyze the descriptions of kickstarter projects to identify commonalities of successful (and unsuccessful projects) using the text mining techniques we covered in the past two lectures. 
