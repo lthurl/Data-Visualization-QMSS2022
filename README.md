@@ -39,4 +39,4 @@ Kickstarter is an American public-benefit corporation based in Brooklyn, New Yor
 
 Kickstarter has reportedly received almost $6 billion in pledges from 20 million backers to fund more than 200,000 creative projects, such as films, music, stage shows, comics, journalism, video games, technology and food-related projects.
 
-For this assignment, I am asking you to analyze the descriptions of kickstarter projects to identify commonalities of successful (and unsuccessful projects) using the text mining techniques we covered in the past two lectures. 
+For this assignment, analyze the descriptions of kickstarter projects to identify commonalities of successful (and unsuccessful projects) using text mining techniques. 
